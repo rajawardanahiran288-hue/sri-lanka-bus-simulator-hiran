@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#123b2a"><meta name="description" content="A low-poly Sri Lankan bus driving prototype from Kandy toward Colombo.">
+<link rel="manifest" href="manifest.json">
+<title>Sri Lanka Bus Simulator 3D</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#8dd3f2;font-family:system-ui,Arial;color:#fff;touch-action:none}canvas{display:block;width:100%;height:100%}#hud{position:fixed;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;pointer-events:none;text-shadow:0 2px 4px #000} .panel{background:#10251dcc;border:1px solid #ffffff40;border-radius:12px;padding:8px 11px;font-size:13px;backdrop-filter:blur(4px)}#title{font-weight:800;font-size:14px}#speed{font-size:22px;font-weight:900}#help{position:fixed;left:50%;top:74px;transform:translateX(-50%);background:#10251dcc;padding:7px 11px;border-radius:9px;font-size:12px;white-space:nowrap;text-align:center;pointer-events:none}#controls{position:fixed;bottom:max(14px,env(safe-area-inset-bottom));left:0;right:0;display:flex;justify-content:space-between;align-items:end;padding:0 15px;gap:12px} .cluster{display:flex;gap:10px;align-items:end}button{border:2px solid #ffffff70;background:#122b23dd;color:#fff;font-weight:800;border-radius:18px;min-width:64px;height:64px;font-size:22px;box-shadow:0 4px 0 #0005;touch-action:none;user-select:none;-webkit-user-select:none}button:active,.pressed{background:#e8b33b;color:#18251d;transform:translateY(2px);box-shadow:0 2px 0 #0005}button.small{font-size:12px;min-width:58px;height:52px}button.long{min-width:75px;height:70px;font-size:15px}#notice{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#10251ddd;padding:8px 12px;border-radius:10px;font-size:12px;max-width:90%;text-align:center;pointer-events:none}#loading{position:fixed;inset:0;background:#8dd3f2;display:grid;place-items:center;color:#123b2a;font-weight:800;z-index:5} @media(min-width:800px){button{opacity:.88}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+</head>
+<body>
+<div id="loading">Starting your bus…</div>
+<div id="hud"><div class="panel"><div id="title">🇱🇰 SRI LANKA BUS SIMULATOR</div><div>KANDY → COLOMBO</div></div><div class="panel" style="text-align:right"><div id="speed">0 km/h</div><div id="distance">0.0 km</div></div></div>
+<div id="help">Low-poly prototype • Touch controls • Landscape recommended</div>
+<div id="notice">Hold ▶ ACCELERATE to drive. Stay on the road!</div>
+<div id="controls"><div class="cluster"><button id="left" aria-label="Steer left">◀</button><button id="right" aria-label="Steer right">▶</button></div><div class="cluster"><button id="brake" class="small">BRAKE</button><button id="accel" class="long">ACCELERATE</button></div></div>
+<script type="module">
+import * as THREE from 'three';
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x8dd3f2);scene.fog=new THREE.Fog(0x8dd3f2,55,230);
+const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,500);camera.position.set(0,5,10);
+const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=false;renderer.outputColorSpace=THREE.SRGBColorSpace;document.body.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0x65834b,2));const sun=new THREE.DirectionalLight(0xfff1cf,2.2);sun.position.set(-20,35,10);scene.add(sun);
+const mat=(c,rough=1)=>new THREE.MeshStandardMaterial({color:c,roughness:rough,flatShading:true});
+const green=mat(0x4c9b55),darkGreen=mat(0x267044),leaf=mat(0x39874a),trunk=mat(0x795239),roadMat=mat(0x444a50),lineMat=mat(0xf4e7bd),soil=mat(0x8aab57),white=mat(0xf4f0dd),red=mat(0xc83335),blue=mat(0x1766a6),black=mat(0x1c2429),glass=mat(0x9bd9e8,.35),yellow=mat(0xffd33f),houseMats=[mat(0xe5c58d),mat(0xe7e2ce),mat(0xd7a278),mat(0xbed3a5)];
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(500,600),soil);ground.rotation.x=-Math.PI/2;ground.position.set(0,-.15,-220);scene.add(ground);
+// Road chunks and lane markings form a gently curving Kandy-Colombo-style route.
+const chunks=[];const CHUNK=35,COUNT=9;function makeChunk(i){const g=new THREE.Group();g.position.z=-i*CHUNK;const road=new THREE.Mesh(new THREE.BoxGeometry(8,.12,CHUNK),roadMat);road.position.y=0;g.add(road);for(let z=-CHUNK/2+2;z<CHUNK/2;z+=5){const dash=new THREE.Mesh(new THREE.BoxGeometry(.12,.025,2.2),lineMat);dash.position.set(0,.075,z);g.add(dash)}for(const side of [-1,1]){const edge=new THREE.Mesh(new THREE.BoxGeometry(.13,.03,CHUNK),white);edge.position.set(side*3.75,.075,0);g.add(edge)}scene.add(g);chunks.push(g);}
+for(let i=0;i<COUNT;i++)makeChunk(i);
+// Low-poly trees, houses and roadside greenery recycle ahead of the bus.
+const scenery=[];function tree(x,z,s=1){const g=new THREE.Group();const t=new THREE.Mesh(new THREE.CylinderGeometry(.14*s,.22*s,1.3*s,5),trunk);t.position.y=.65*s;g.add(t);for(let j=0;j<3;j++){const crown=new THREE.Mesh(new THREE.ConeGeometry((.85-j*.13)*s,1.15*s,5),j===1?darkGreen:leaf);crown.position.y=(1.45+j*.48)*s;g.add(crown)}g.position.set(x,0,z);scene.add(g);scenery.push({obj:g,z});}
+function house(x,z){const g=new THREE.Group();const body=new THREE.Mesh(new THREE.BoxGeometry(2.6,1.5,2.3),houseMats[Math.floor(Math.random()*houseMats.length)]);body.position.y=.8;g.add(body);const roof=new THREE.Mesh(new THREE.ConeGeometry(2.05,1.1,4),red);roof.rotation.y=Math.PI/4;roof.position.y=2.05;roof.scale.set(1,1,.8);g.add(roof);const door=new THREE.Mesh(new THREE.BoxGeometry(.4,.8,.05),trunk);door.position.set(0,.4,1.18);g.add(door);g.position.set(x,0,z);scene.add(g);scenery.push({obj:g,z});}
+for(let i=0;i<65;i++){let z=-8-Math.random()*260;let side=Math.random()<.5?-1:1;let x=side*(6+Math.random()*16);if(Math.random()<.23)house(x,z);else tree(x,z,.65+Math.random()*.75)}
+// distant low-poly green hills
+for(let i=0;i<18;i++){const h=new THREE.Mesh(new THREE.ConeGeometry(12+Math.random()*10,18+Math.random()*18,5),i%2?darkGreen:green);h.position.set((i%2?1:-1)*(25+Math.random()*40),4,-40-i*13);scene.add(h)}
+// Bus model: red/blue private coach with windows, lights, wheels and route board.
+const bus=new THREE.Group();scene.add(bus);bus.position.set(0,0,2);
+function box(parent,w,h,d,color,x,y,z){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),color);m.position.set(x,y,z);parent.add(m);return m}
+box(bus,2.05,1.35,4.3,blue,0,1.05,0);box(bus,1.95,.65,3.35,red,0,2.02,-.12);box(bus,1.98,.16,4.15,white,0,1.58,0);box(bus,1.7,.23,.08,yellow,0,2.38,-1.82);
+// windshield and side windows
+box(bus,1.62,.58,.045,glass,0,2.03,1.67);for(const side of [-1,1]){for(let z=-1.28;z<=1.25;z+=.62)box(bus,.035,.48,.48,glass,side*1.035,2.04,z);box(bus,.04,.24,2.5,white,side*1.04,1.48,0);}
+box(bus,.42,.13,.05,yellow,-.63,.83,2.17);box(bus,.42,.13,.05,yellow,.63,.83,2.17);box(bus,1.65,.13,.06,red,0,.68,-2.17);
+const wheels=[];for(const x of [-1.05,1.05])for(const z of [-1.35,1.35]){const w=new THREE.Mesh(new THREE.CylinderGeometry(.39,.39,.22,8),black);w.rotation.z=Math.PI/2;w.position.set(x,.42,z);bus.add(w);wheels.push(w);const hub=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,.235,8),mat(0xb9c1c5));hub.rotation.z=Math.PI/2;hub.position.set(x*1.01,.42,z);bus.add(hub)}
+// Simple route board
+const board=box(bus,.95,.22,.05,white,0,2.43,1.86);board.material=yellow;
+let speed=0,steer=0,distance=0,roadOffset=0;const keys={left:false,right:false,accel:false,brake:false};
+function bind(id,key){const el=document.getElementById(id);const down=e=>{e.preventDefault();keys[key]=true;el.classList.add('pressed')};const up=e=>{e.preventDefault();keys[key]=false;el.classList.remove('pressed')};el.addEventListener('pointerdown',down);['pointerup','pointercancel','pointerleave'].forEach(ev=>el.addEventListener(ev,up));}
+bind('left','left');bind('right','right');bind('accel','accel');bind('brake','brake');
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='a')keys.left=true;if(e.key==='ArrowRight'||e.key==='d')keys.right=true;if(e.key==='ArrowUp'||e.key==='w')keys.accel=true;if(e.key==='ArrowDown'||e.key==='s')keys.brake=true});addEventListener('keyup',e=>{if(e.key==='ArrowLeft'||e.key==='a')keys.left=false;if(e.key==='ArrowRight'||e.key==='d')keys.right=false;if(e.key==='ArrowUp'||e.key==='w')keys.accel=false;if(e.key==='ArrowDown'||e.key==='s')keys.brake=false});
+const clock=new THREE.Clock();function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.04);if(keys.accel)speed=Math.min(82,speed+27*dt);else speed=Math.max(0,speed-5*dt);if(keys.brake)speed=Math.max(0,speed-48*dt);steer=(keys.left?1:0)-(keys.right?1:0);bus.position.x+=steer*dt*(1.4+speed*.075);bus.position.x=THREE.MathUtils.clamp(bus.position.x,-5.1,5.1);bus.rotation.z=THREE.MathUtils.lerp(bus.rotation.z,-steer*.07,.1);bus.rotation.y=THREE.MathUtils.lerp(bus.rotation.y,-steer*.12,.08);const move=speed*dt*.32;distance+=move/1000;roadOffset+=move;for(const c of chunks){c.position.z+=move;if(c.position.z>CHUNK)c.position.z-=CHUNK*COUNT;}for(const o of scenery){o.obj.position.z+=move;if(o.obj.position.z>12){o.obj.position.z=-245-Math.random()*30;o.z=o.obj.position.z;const x=o.obj.position.x;o.obj.position.x=Math.sign(x)*(6+Math.random()*16)}}wheels.forEach(w=>w.rotation.x-=move*1.5);camera.position.x=THREE.MathUtils.lerp(camera.position.x,bus.position.x*.65,.06);camera.position.y=4.8;camera.position.z=9.5;camera.lookAt(bus.position.x*.6,1.1,-5);document.getElementById('speed').textContent=Math.round(speed)+' km/h';document.getElementById('distance').textContent=distance.toFixed(2)+' km';renderer.render(scene,camera)}
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+setTimeout(()=>document.getElementById('loading').remove(),800);animate();
+if('serviceWorker' in navigator && location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+</script>
+</body></html>
